@@ -1,0 +1,96 @@
+=head1 NAME
+
+Net::ParSCP - Parallel secure copy
+
+=head1 SYNOPSIS
+
+  # One liner: transfers 'file' to all 
+  # the machines in cluster 'clu' but 'june'
+  $ perl -MNet::ParSCP \
+     -e 'parpush(sourcefile=>q{file}, destination=>q{clu-june:/tmp/})'
+
+=head1 DESCRIPTION
+
+Functions in this module are for the implementation of
+the script L<parpush>. 
+
+=head2 parpush
+
+The only sub of interest is C<parpush>:
+
+
+  ($okh, $pid) = parpush(
+    configfile  => $configfile,
+    destination => [ 'cluster1:/path1', 'cluster2:/path2' ],
+    scp         => $scp,
+    scpoptions  => $scpoptions,
+    sourcefile  => $sourcefile,
+  );
+
+only C<sourcefile> and C<destination> are required. The
+other arguments are optional.
+
+In a list context returns to hash references C<($okh, $pid)>.
+
+=over 2
+
+=item C<%$okh> is a hash with keys the names of the machines considered
+during the connection. The value is true (1) if the connection
+was closed succesfully, false otherwise.
+
+=item  C<%$pid> is a hash with keys the names of the machines considered
+during the connection. The value is the process identifier of the 
+process that made the C<scp> to that machine, C<undef> if the fork
+failed.
+
+=back
+
+=head1 EXPORT
+
+  parpush
+  exec_cssh
+  help 
+  version
+  usage 
+  $VERBOSE
+
+=head1 SEE ALSO
+
+=over 2
+
+
+=item * L<Set::Scalar>
+
+
+
+=item * Cluster ssh: cssh L<http://sourceforge.net/projects/clusterssh/>
+
+
+
+=item * Project C3 L<http://www.csm.ornl.gov/torc/C3/>
+
+
+
+=item * L<parpush>
+
+
+=back
+
+=head1 AUTHOR
+
+Casiano Rodriguez-Leon E<lt>casiano.rodriguez.leon@gmail.comE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+
+Copyright (C) 2009-2009 by Casiano Rodriguez-Leon
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.8 or,
+at your option, any later version of Perl 5 you may have available.
+
+
+
+
+=cut
+

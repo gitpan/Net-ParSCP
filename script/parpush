@@ -1,0 +1,49 @@
+#!/usr/bin/perl -w
+use strict;
+use Getopt::Long;
+use Net::ParSCP;
+
+# Command line options
+my $configfile = "Cluster";
+my $scp = 'scp';
+my $scpoptions = '';
+my $maxprocesses = 8; # control the maximum number of processes at any time
+my $cssh = 0;
+
+Getopt::Long::Configure('no_ignore_case');
+my $result = GetOptions(
+                'configfile=s', \$configfile,
+                'scpoptions=s', \$scpoptions,
+                'program=s',    \$scp,
+                'processes=i',  \$maxprocesses,
+                'verbose',      \$VERBOSE,
+                'xterm',        \$cssh,
+                'help',         \&help,
+                'Version',      \&version,
+             );
+
+my $sourcefile = shift;
+
+usage("Error. Not defined source file\n") unless defined($sourcefile); 
+
+if ($sourcefile !~ /:/) { # local source file: check for existence
+  my @sourcefile = split /\s+/, $sourcefile;
+  my @nonreadble = grep { !-r $_ } @sourcefile;
+  usage("Error. Can't read @nonreadble\n") if @nonreadble;
+  $scpoptions .= ' -r' if (grep { -d } @sourcefile);
+}
+# Set recursive option for scp if source is a directory
+
+usage("Error. Provide a destination target!\n") unless @ARGV;
+
+my $okh = parpush(
+  configfile  => $configfile,
+  destination => \@ARGV,
+  scp         => $scp,
+  scpoptions  => $scpoptions,
+  sourcefile  => $sourcefile,
+);
+
+my @machines = keys %$okh;
+exec_cssh(@machines) if $cssh && (@machines);
+
