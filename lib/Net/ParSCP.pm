@@ -17,7 +17,7 @@ our @EXPORT = qw(
   $VERBOSE
 );
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 our $VERBOSE = 0;
 
 # Create methods for each defined machine or cluster

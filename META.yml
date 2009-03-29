@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Net-ParSCP
-version:            0.02
+version:            0.03
 abstract:           Parallel secure copy
 author:
     - Casiano Rodriguez-Leon <casiano.rodriguez.leon@gmail.com>

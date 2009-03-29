@@ -65,6 +65,13 @@ parpush - Secure transfer a file/directory to a cluster of machines via SSH
   # sends 'localfile.txt' in the local machine and 'remote.txt' in 'machine4'
   # to machine3
 
+  # globs can be used in the sourcefile argument:
+
+  $ parpush  'file* machine1:*.pl' cluster2-machine2:/tmp
+
+  # All the files matching the glob 'file*' in the local machine will be sent.
+  # Also those in machine1 matching the glob '*.pl'
+
 
 
 =head1 INSTALLATION
@@ -268,7 +275,6 @@ inside single quotes as in:
 
 the only cluster expressions allowed in sourcefile expressions are machines.
 Cluster expressions aren't supported.
-
 
 =head1 SEE ALSO
 
