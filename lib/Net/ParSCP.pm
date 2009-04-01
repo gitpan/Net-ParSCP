@@ -17,7 +17,7 @@ our @EXPORT = qw(
   $VERBOSE
 );
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 our $VERBOSE = 0;
 
 # Create methods for each defined machine or cluster
@@ -39,7 +39,7 @@ sub create_machine_alias {
 }
 
 sub read_configfile {
-  my $configfile = shift;
+  my $configfile = $_[0];
 
 
   if (-r $configfile) {
@@ -50,7 +50,7 @@ sub read_configfile {
   }
 
   # Configuration file not found. Try with ~/.csshrc of cssh
-  $configfile = "$ENV{HOME}/.csshrc";
+  $configfile = $_[0] = "$ENV{HOME}/.csshrc";
   if (-r $configfile) {
     open(my $f, $configfile);
 
@@ -77,10 +77,10 @@ sub read_configfile {
 
 ############################################################
 sub parse_configfile {
-  my $configfile = shift;
+  my $configfile = $_[0];
   my %cluster;
 
-  my @desc = read_configfile($configfile);
+  my @desc = read_configfile($_[0]);
 
   for (@desc) {
     next if /^\s*(#.*)?$/;
@@ -186,7 +186,17 @@ sub exec_cssh {
   warn "Executing system command:\n\t$csshcommand\n" if $VERBOSE;
   my $pid;
   exec("$csshcommand &");
-  die "Can't find cssh\n";
+  die "Can't execute cssh\n";
+}
+
+sub warnundefined {
+  my ($configfile, @errors) = @_;
+
+  local $" = ", ";
+  my $prefix = (@errors > 1) ?
+      "Error. Identifiers (@errors) do"
+    : "Error. Identifier (@errors) does";
+  warn "$prefix not correspond to any cluster or machine defined in $configfile. Skipping.\n";
 }
 
 sub declared_all_ids {
@@ -194,15 +204,9 @@ sub declared_all_ids {
   my $clusterexp = shift;
   my %cluster = @_;
 
-  my @clusterexp = $clusterexp =~ m{([a-zA-Z_][\w.\@]*)};
+  my @clusterexp = $clusterexp =~ m{([a-zA-Z_][\w.\@]*)}g;
   if (my @errors = grep { !exists($cluster{$_}) } @clusterexp) {
-    local $" = ", ";
-    if (@errors > 1) {
-      warn "Error. Identifiers (@errors) do not correspond to any cluster or machine defined in $configfile. Skipping.\n";
-    }
-    else {
-      warn "Error. Identifier (@errors) does not correspond to any cluster or machine defined in $configfile. Skipping.\n";
-    }
+    warnundefined($configfile, @errors);
     return 0;
   }
   return 1;
@@ -315,11 +319,8 @@ sub spawn_secure_copies {
 
 sub parpush {
   my %arg = @_;
-  my $configfile = $arg{configfile};
-  delete $arg{configfile};
 
-  $configfile = 'Cluster' unless $configfile;
-  my ($cluster, $method) = parse_configfile($configfile);
+  my ($cluster, $method) = parse_configfile($arg{configfile});
 
   my $readset = IO::Select->new();
 
@@ -336,7 +337,7 @@ sub parpush {
 
   my $okh = wait_for_answers($readset, $proc);
 
-  return wantarray? $okh : ($okh, $pid);
+  return wantarray? ($okh, $pid) : $okh;
 }
 
 1;
