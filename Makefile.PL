@@ -5,7 +5,12 @@ use strict;
 # the contents of the Makefile that is written.
 
 if (defined($ENV{DEVELOPER}) && ($ENV{DEVELOPER} eq 'casiano')) {
-  system('make -f makepods') and die "Can't build pods!";
+  if (-r 'makepods') {
+    system('make -f makepods') and die "Can't build pods!";
+  }
+  else {
+    warn "makepods not found!. Skipping creation of pods\n";
+  }
 }
 
 my @exe_files = map { "script/$_" } qw{parpush};

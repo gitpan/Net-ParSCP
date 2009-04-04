@@ -5,7 +5,7 @@ console_position=
 extra_cluster_file=
 history_height=10
 history_width=40
-ignore_host_errors=no
+ignore_host_errors=yes
 key_addhost=Control-plus
 key_clientname=Alt-n
 key_paste=Control-v
@@ -38,6 +38,18 @@ unmap_on_redraw=no
 use_hotkeys=yes
 window_tiling=yes
 window_tiling_direction=right
-clusters = virtual
-virtual = local1 local2 local3
-
+clusters = beno ben beo bno bco be bo eo et num beat local
+beno = beowulf europa nereida orion
+ben = beowulf europa nereida 
+beo = beowulf europa orion
+bno = beowulf nereida orion
+bco = beowulf casnereida orion
+be  = beowulf europa
+bo  = beowulf orion
+eo  =  europa orion
+et  = europa etsii
+#     europa          etsii
+num = 193.145.105.175 193.145.101.246
+# With @
+beat  = casiano@beowulf casiano@europa
+local = local1 local2 local3 

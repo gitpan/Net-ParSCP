@@ -17,7 +17,7 @@ our @EXPORT = qw(
   $VERBOSE
 );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 our $VERBOSE = 0;
 
 # Create methods for each defined machine or cluster
@@ -276,15 +276,15 @@ sub spawn_secure_copies {
   my (%pid, %proc);
   for (@destination) {
 
-    unless (/:/) {
-      warn "Error. Destination $_ must have a colon (:). Skipping transfer.\n";
+    unless (/^[^:]+:[^:]*$/) {
+      warn "Error. Destination '$_' must have just one colon (:). Skipping transfer.\n";
       next;
     }
 
     my ($clusterexp, $path) = split /\s*:\s*/;
 
     unless (length($clusterexp)) {
-      warn "Error. Destination $_ must have a cluster specification. Skipping transfer.\n";
+      warn "Error. Destination '$_' must have a cluster specification. Skipping transfer.\n";
       next;
     }
 
@@ -294,7 +294,9 @@ sub spawn_secure_copies {
     my $set = eval $clusterexp;
 
     unless (defined($set) && ref($set) && $set->isa('Set::Scalar')) {
-      warn "Error. Expression $clusterexp has errors. Skipping.\n$@\n";
+      $clusterexp =~ s/_\d+_//g;
+      $clusterexp =~ s/[()]//g;
+      warn "Error. Expression '$clusterexp' has errors. Skipping.\n";
       next;
     }
 
