@@ -17,7 +17,7 @@ our @EXPORT = qw(
   $VERBOSE
 );
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 our $VERBOSE = 0;
 
 # Create methods for each defined machine or cluster
@@ -194,22 +194,23 @@ sub warnundefined {
 
   local $" = ", ";
   my $prefix = (@errors > 1) ?
-      "Error. Identifiers (@errors) do"
-    : "Error. Identifier (@errors) does";
-  warn "$prefix not correspond to any cluster or machine defined in $configfile. Skipping.\n";
+      "Machine identifiers (@errors) do"
+    : "Machine identifier (@errors) does";
+  warn "$prefix not correspond to any cluster or machine defined in ".
+       " cluster description file '$configfile'.\n";
 }
 
-sub declared_all_ids {
+sub non_declared_machines {
   my $configfile = shift;
   my $clusterexp = shift;
   my %cluster = @_;
 
+  my @unknown;
   my @clusterexp = $clusterexp =~ m{([a-zA-Z_][\w.\@]*)}g;
-  if (my @errors = grep { !exists($cluster{$_}) } @clusterexp) {
-    warnundefined($configfile, @errors);
-    return 0;
+  if (@unknown = grep { !exists($cluster{$_}) } @clusterexp) {
+    warnundefined($configfile, @unknown) if $VERBOSE;
   }
-  return 1;
+  return @unknown;
 }
 
 sub wait_for_answers {
@@ -288,7 +289,11 @@ sub spawn_secure_copies {
       next;
     }
 
-    next unless declared_all_ids($configfile, $clusterexp, %cluster);
+    # Autodeclare unknown machine identifiers
+    my @unknown = non_declared_machines($configfile, $clusterexp, %cluster);
+    my %unknown = map { $_ => Set::Scalar->new($_)} @unknown;
+    %cluster = (%cluster, %unknown); # union
+    %method = (%method, %{create_machine_alias(%unknown)});
 
     $clusterexp =~ s/(\w[\w.\@]*)/$method{$1}()/g;
     my $set = eval $clusterexp;
