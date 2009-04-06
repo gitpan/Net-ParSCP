@@ -12,6 +12,8 @@ parpush - Secure transfer a file/directory to a cluster of machines via SSH
       cluster2 = machine2 machine4 machine5
       num = 193.140.101.175 193.140.101.246
 
+  # or have the .csshrc file associated with cssh.
+
   # Copy 'sourcefile' to the union of cluster1 and cluster2
 
   $ parpush sourcefile  cluster1+cluster2:/tmp 
@@ -71,6 +73,12 @@ parpush - Secure transfer a file/directory to a cluster of machines via SSH
 
   # All the files matching the glob 'file*' in the local machine will be sent.
   # Also those in machine1 matching the glob '*.pl'
+
+  $ parpush  'machine1:*.pl machine2:dir/' :/tmp
+
+  # All the files matching the glob 'file*' in the 'machine1' will be sent
+  # to the local machine.  The directory 'dir/' in machine2 will be also sent
+  # to '/tmp/dir/' in the local machine.
 
 
 

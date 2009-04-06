@@ -5,13 +5,13 @@
 
 # change 'tests => 1' to 'tests => last_test_to_print';
 
-use Test::More tests => 9;
+use Test::More tests => 13;
 BEGIN { use_ok('Net::ParSCP') };
 
 #########################
 
 SKIP: {
-  skip("Developer test", 8) unless ($ENV{DEVELOPER} && -x "script/parpush" && ($^O =~ /nux$/));
+  skip("Developer test", 12) unless ($ENV{DEVELOPER} && -x "script/parpush" && ($^O =~ /nux$/));
 
      my $output = `script/parpush -v MANIFEST  beo-chum:/tmp 2>&1`;
      like($output, qr/(identifier \(chum\) does not correspond)|(ssh:.*not known)/, 'Illegal machine name');
@@ -37,6 +37,13 @@ SKIP: {
      $output = `script/parpush -v MANIFEST  pleuropa: 2>&1`;
      unlike($output, qr/(identifier \(chum\) does not correspond)|(ssh:.*not known)/, 'non declared but existing machine');
 
+     system('rm -fR /tmp/.bashrc /tmp/tutu/');
+
+     $output = `script/parpush -v 'orion:.bashrc beowulf:tutu/' :/tmp/`;
+     like($output, qr{^\s*$}, 'remote to local: no warnings');
+     ok(-e '/tmp/.bashrc', 'remote file transferred');
+     ok(-x '/tmp/tutu', 'remote dir transferred');
+     ok(!$?, 'remote to local: status 0');
 }
 
 

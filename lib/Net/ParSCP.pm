@@ -17,7 +17,7 @@ our @EXPORT = qw(
   $VERBOSE
 );
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 our $VERBOSE = 0;
 
 # Create methods for each defined machine or cluster
@@ -277,12 +277,21 @@ sub spawn_secure_copies {
   my (%pid, %proc);
   for (@destination) {
 
-    unless (/^[^:]+:[^:]*$/) {
-      warn "Error. Destination '$_' must have just one colon (:). Skipping transfer.\n";
+    my ($clusterexp, $path);
+    unless (/^([^:]*):([^:]*)$/) {
+      warn "Error. Destination '$_' must have no more than one colon (:). Skipping transfer.\n";
       next;
     }
 
-    my ($clusterexp, $path) = split /\s*:\s*/;
+    if ($1) {
+      ($clusterexp, $path) = split /\s*:\s*/;
+    }
+    else {
+      ($clusterexp, $path) = ('', $2);
+      $scpoptions .= '-r';
+      $pid{localhost} = open(my $p, "$scp $scpoptions $sourcefile $path 2>&1 |");
+      next;
+    }
 
     unless (length($clusterexp)) {
       warn "Error. Destination '$_' must have a cluster specification. Skipping transfer.\n";
