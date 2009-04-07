@@ -80,6 +80,20 @@ parpush - Secure transfer a file/directory to a cluster of machines via SSH
   # to the local machine.  The directory 'dir/' in machine2 will be also sent
   # to '/tmp/dir/' in the local machine.
 
+  $ parpush 'machine1:file.txt machine2:file.txt' machine3/tmp/file_txt.@#  
+
+  # The macro '@#' stands for the "source machine". Thus, in the example
+  # above file 'file.txt' in machine1 will be copied to file '/tmp/file.txt.machine1'
+  # in machine3. File 'file.txt' in machine2 will be copied to 
+  # file '/tmp/file.txt.machine2' in machine3.
+
+  $ parpush 'machine1:file.txt machine2:file.txt' :/tmp/file_txt.@#  
+
+  # The macro '@#' stands for the "source machine". Thus, in the example
+  # above file 'file.txt' in machine1 will be copied to file '/tmp/file.txt.machine1'
+  # in the local machine. File 'file.txt' in machine2 will be copied to 
+  # file '/tmp/file.txt.machine2' in the local machine
+
 
 
 =head1 INSTALLATION
@@ -262,7 +276,7 @@ C<~/.csshrc> file.
 
 =back
 
-=head2 Path Syntax
+=head2 Path Syntax. The C<@=> macro
 
 Inside a path the macro C<@=> stands for the name
 of the current machine.
@@ -271,7 +285,21 @@ Thus, the command:
   $ parpush file.txt machine1+machine2:/tmp/@=.txt
 
 copies C<file.txt> to C<machine1.txt> in C<machine1>
-and to to C<machine2.txt> in C<machine2>.
+and to C<machine2.txt> in C<machine2>.
+
+=head2 Path Syntax. The C<@#> macro
+
+Inside a path the macro C<@#> stands for the name
+of the source machine.
+Thus, the command:
+
+  $ parpush 'machine1:file.txt machine2:file.txt' :/tmp/file_txt.@#  
+
+copies C<file.txt> in C<machine1>
+to C</tmp/file.txt.machine1> in the 
+local machine and the file with the same name in 
+C<machine2> to the file C</tmp/file.txt.machine2>.
+
 
 =head2 Source Syntax
 

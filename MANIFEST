@@ -2,7 +2,8 @@ Changes
 Makefile.PL
 MANIFEST
 README
-t/Net-ParSCP.t
+t/01net-parscp.t
+t/02net-parscp.t
 lib/Net/ParSCP.pm
 lib/Net/ParSCP.pod
 script/parpush
