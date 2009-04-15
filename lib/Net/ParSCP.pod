@@ -9,6 +9,33 @@ Net::ParSCP - Parallel secure copy
   $ perl -MNet::ParSCP \
      -e 'parpush(sourcefile=>q{file}, destination=>q{clu-june:/tmp/})'
 
+=head1 OPTIONS
+
+Usage:
+  parpush [ options ] sourcefile clusterexp1:/path1 clusterexp2:/path2 ...
+
+Valid options:
+
+ --configfile file : Configuration file
+
+ --scpoptions      : A string with the options for scp.
+                     The default is no options and '-r' if 
+                     sourcefile is adirectory
+
+ --program         : A string with the name of the program to use for secure copy
+                     by default is 'scp'
+
+ --processes       : Maximum number of concurrent processes
+
+ --verbose
+
+ --xterm           : runs cssh to the target machines
+
+ --help            : this help
+
+ --Version
+
+
 =head1 DESCRIPTION
 
 Functions in this module are for the implementation of

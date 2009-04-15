@@ -7,7 +7,6 @@ t/02net-parscp.t
 lib/Net/ParSCP.pm
 lib/Net/ParSCP.pod
 script/parpush
-script/parpush.pod
 examples/Cluster
 examples/automatic_authentication.instructions
 examples/Cluster

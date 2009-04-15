@@ -4,6 +4,7 @@ use warnings;
 
 use Set::Scalar;
 use IO::Select;
+use Pod::Usage;
 #use Sys::Hostname;
 
 require Exporter;
@@ -12,14 +13,16 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(
   parpush
   exec_cssh
-  help 
+  help
   version
   usage 
   $VERBOSE
+  $DRYRUN
 );
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 our $VERBOSE = 0;
+our $DRYRUN = 0;
 
 # Create methods for each defined machine or cluster
 sub create_machine_alias {
@@ -39,6 +42,7 @@ sub create_machine_alias {
   return \%method;
 }
 
+# Return an array with the relevant lines of the config file
 sub read_configfile {
   my $configfile = $_[0];
 
@@ -108,8 +112,12 @@ sub parse_configfile {
 sub version {
   my $errmsg = shift;
 
-  print "$VERSION\n";
-  exit(0);
+  print "Version: $VERSION\n";
+  pod2usage(
+    -verbose => 99, 
+    -sections => "AUTHOR|COPYRIGHT AND LICENSE", 
+    -exitval => 0,
+  );
 }
 
 
@@ -118,53 +126,21 @@ sub usage {
   my $errmsg = shift;
 
   warn "$errmsg\n";
-  help();
+  pod2usage(
+    -verbose => 99, 
+    -sections => "NAME|SYNOPSIS|OPTIONS", 
+    -exitval => 1,
+  );
 }
 
 sub help {
-  warn << "HELPMSG";
-Usage:
-  $0 [ options ] sourcefile clusterexp1:/path1 clusterexp2:/path2 ...
-
-Cluster expressions like:
-
-  $0 file 'cluster1-machine2:/tmp'
-  $0 file 'cluster1-machine2:/tmp/file_@=.txt'
-  $0 -s '-v' dir/  cluster1+cluster2:/tmp cluster3:/scratch/
-
-are accepted. The macro C<@=> inside a path expands to the name of the machine.
-To transfer several files, protect them with quotes:
-
-  $0 'file1 machine3:file2' cluster1%cluster2:  
-
-it transfer file1 in the local machine and file2 in machine3 
-to the machines in the symmetric difference of clusters cluster1 
-and cluster2.
-
-Valid options:
-
- --configfile file : Configuration file
-
- --scpoptions      : A string with the options for scp.
-                     The default is no options and '-r' if 
-                     sourcefile is adirectory
-
- --program         : A string with the name of the program to use for secure copy
-                     by default is 'scp'
-
- --processes       : Maximum number of concurrent processes
-
- --verbose
-
- --xterm           : runs cssh to the target machines
-
- --help            : this help
-
- --Version
-
-HELPMSG
-  exit(1);
+  pod2usage(
+    -verbose => 99, 
+    -sections => "NAME|SYNOPSIS|OPTIONS", 
+    -exitval => 0,
+  );
 }
+
 
 ############################################################
 {
@@ -263,6 +239,56 @@ sub wait_for_answers {
   return \%result;
 }
 
+# Find out what source machines are involved 
+# %source is returned. machine => [ paths ]
+# key '' represents the local machine
+{
+  my $nowhitenocolons = '(?:[^\s:]|\\\s)+'; # escaped spaces are allowed
+
+  sub parse_sourcefile {
+    my $sourcefile = shift;
+
+    my @externalmachines = $sourcefile =~ /($nowhitenocolons):($nowhitenocolons)/g;
+    my @localpaths = $sourcefile =~ /(?:^|\s) # begin or space
+                                     ($nowhitenocolons)
+                                     (?:\s|$) # end or space
+                                    /xg;
+    
+    my %source;
+    $source{''} = \@localpaths if @localpaths; # '' is the local machine
+    while (my ($machine, $path) = splice(@externalmachines, 0, 2)) {
+      if (exists $source{$machine} ) {
+        push @{$source{$machine}}, $path;
+      }
+      else {
+        $source{$machine} = [ $path ]
+      }
+    }
+    return %source;
+  }
+}
+
+# Autodeclare unknown machine identifiers
+sub translate {
+  my ($configfile, $clusterexp, $cluster, $method) = @_;
+
+  my @unknown = non_declared_machines($configfile, $clusterexp, %$cluster);
+  my %unknown = map { $_ => Set::Scalar->new($_)} @unknown;
+  %$cluster = (%$cluster, %unknown); # union
+  %$method = (%$method, %{create_machine_alias(%unknown)});
+
+  $clusterexp =~ s/(\w[\w.\@]*)/$method->{$1}()/g;
+  my $set = eval $clusterexp;
+
+  unless (defined($set) && ref($set) && $set->isa('Set::Scalar')) {
+    $clusterexp =~ s/_\d+_//g;
+    $clusterexp =~ s/[()]//g;
+    warn "Error. Expression '$clusterexp' has errors. Skipping.\n";
+    return;
+  }
+  return $set;
+}
+
 sub spawn_secure_copies {
   my %arg = @_;
   my $readset = $arg{readset};
@@ -274,30 +300,72 @@ sub spawn_secure_copies {
   my $scp = $arg{scp} || 'scp';
   my $scpoptions = $arg{scpoptions} || '';
   my $sourcefile = $arg{sourcefile};
+  my $name = $arg{name};
+  
+  # '' and localhost are synonimous
+  if (exists $name->{''}) {
+    $name->{localhost} = $name->{''} 
+  }
+  elsif (exists $name->{localhost}) {
+    $name->{''} = $name->{localhost};
+  }
+  else { 
+    $name->{localhost} =  $name->{''} = 'localhost'
+  }
+  $VERBOSE++ if $DRYRUN;
 
   # hash source: keys: source machines. values: lists of source paths for that machine
   my (%pid, %proc, %source);
 
   # @# stands for the source machine: decompose the transfer, one per source machine
-  if ("@destination" =~ /@#/) { 
-    # find out what source machines are involved 
-    my $nowhitenocolons = '(?:[^\s:]|\\\s)+'; # escaped spaces are allowed
-    my @externalmachines = $sourcefile =~ /($nowhitenocolons):($nowhitenocolons)/g;
-    my @localpaths = $sourcefile =~ /(?:^|\s) # begin or space
-                                     ($nowhitenocolons)
-                                     (?:\s|$) # end or space
-                                    /xg;
-    
-    @{$source{''}} = [ @localpaths ] if @localpaths; # '' is the local machine
-    while (my ($machine, $path) = splice(@externalmachines, 0, 2)) {
-      if (exists $source{$machine} ) {
-        push @{$source{$machine}}, $path;
-      }
-      else {
-        $source{$machine} = [ $path ]
+  %source = parse_sourcefile($sourcefile) if "@destination" =~ /@#/;
+
+  # expand clusters in sourcefile
+
+  my $sendfiles = sub {
+    my ($m, $cp) = @_;
+
+    # @= is a macro and means "the name of the target machine"
+    my $targetname = exists($name->{$m}) ? $name->{$m} : $m;
+    $cp =~ s/@=/$targetname/g;
+
+    if ($cp =~ /@#/ && %source) {
+      # @# stands for source machine: decompose transfer
+      for my $sm (keys %source) {
+        my $sf = $sm? "$sm:@{$source{$sm}}" : "@{$source{$sm}}"; # $sm: source machine
+        my $fp = $cp;                   # $fp: path customized for this source machine
+
+        # what if it is $sm eq '' the localhost?
+        my $sn = $sm;
+        $sn = $name->{$sm} if (exists $name->{$sm});
+        $fp =~ s/@#/$sn/g;
+
+        my $target = ($m eq 'localhost')? $fp : "$m:$fp";
+        warn "Executing system command:\n\t$scp $scpoptions $sf $target\n" if $VERBOSE;
+        unless ($DRYRUN) {
+          my $pid;
+          $pid{$m} = $pid = open(my $p, "$scp $scpoptions $sf $target 2>&1 |");
+          warn "Can't execute scp $scpoptions $sourcefile $target", next unless defined($pid);
+
+          $proc{0+$p} = $m;
+          $readset->add($p);
+        }
       }
     }
-  }
+    else {
+      my $target = ($m eq 'localhost')? $cp : "$m:$cp";
+      warn "Executing system command:\n\t$scp $scpoptions $sourcefile $target\n" if $VERBOSE;
+
+      unless ($DRYRUN) {
+        my $pid;
+        $pid{$m} = $pid = open(my $p, "$scp $scpoptions $sourcefile $target 2>&1 |");
+        warn "Can't execute scp $scpoptions $sourcefile $m:$cp", next unless defined($pid);
+
+        $proc{0+$p} = $m;
+        $readset->add($p);
+      }
+    }
+  };
 
   for (@destination) {
 
@@ -309,82 +377,17 @@ sub spawn_secure_copies {
 
     if ($1) {  # There is a target machine
       ($clusterexp, $path) = split /\s*:\s*/;
+      my $set = translate($configfile, $clusterexp, \%cluster, \%method);
+      next unless $set;
+
+      $sendfiles->($_, $path) for ($set->members);
     }
-    else { # No target cluster: destiny is the local machine
-      ($clusterexp, $path) = ('', $2);
+    else { # No target cluster: target is the local machine
+      $path = $2;
       $scpoptions .= '-r';
-
-      if ($path =~ /@#/ && %source) {
-        # @# stands for source machine: decompose transfer
-        for my $sm (keys %source) {
-          my $sf = $sm? "$sm:@{$source{$sm}}" : "@{$source{$sm}}"; # $sm: source machine
-          my $fp = $path;                 # $fp: path customized for this source machine
-          $fp =~ s/@#/$sm/g;
-          warn "Executing system command:\n\t$scp $scpoptions $sf $fp\n" if $VERBOSE;
-          my $pid;
-          $pid{localhost} = $pid = open(my $p, "$scp $scpoptions $sf $fp 2>&1 |");
-          warn "Can't execute scp $scpoptions $sourcefile $fp", next unless defined($pid);
-
-          $proc{0+$p} = 'localhost';
-          $readset->add($p);
-        }
-      }
-      else {
-        $pid{localhost} = open(my $p, "$scp $scpoptions $sourcefile $path 2>&1 |");
-        $proc{0+$p} = 'localhost';
-        $readset->add($p);
-      }
-      next;
+      $sendfiles->('localhost', $path);
     }
-
-    # Autodeclare unknown machine identifiers
-    my @unknown = non_declared_machines($configfile, $clusterexp, %cluster);
-    my %unknown = map { $_ => Set::Scalar->new($_)} @unknown;
-    %cluster = (%cluster, %unknown); # union
-    %method = (%method, %{create_machine_alias(%unknown)});
-
-    $clusterexp =~ s/(\w[\w.\@]*)/$method{$1}()/g;
-    my $set = eval $clusterexp;
-
-    unless (defined($set) && ref($set) && $set->isa('Set::Scalar')) {
-      $clusterexp =~ s/_\d+_//g;
-      $clusterexp =~ s/[()]//g;
-      warn "Error. Expression '$clusterexp' has errors. Skipping.\n";
-      next;
-    }
-
-    for my $m ($set->members) {
-      # @= is a macro and means "the name of the destiny machine"
-      my $cp = $path;
-      $cp =~ s/@=/$m/g;
-
-      if ($cp =~ /@#/ && %source) {
-        # @# stands for source machine: decompose transfer
-        for my $sm (keys %source) {
-          my $sf = $sm? "$sm:@{$source{$sm}}" : "@{$source{$sm}}"; # $sm: source machine
-          my $fp = $cp;                   # $fp: path customized for this source machine
-          $fp =~ s/@#/$sm/g;
-          warn "Executing system command:\n\t$scp $scpoptions $sf $m:$fp\n" if $VERBOSE;
-          my $pid;
-          $pid{$m} = $pid = open(my $p, "$scp $scpoptions $sf $m:$fp 2>&1 |");
-          warn "Can't execute scp $scpoptions $sourcefile $m:$fp", next unless defined($pid);
-
-          $proc{0+$p} = $m;
-          $readset->add($p);
-        }
-      }
-      else {
-        warn "Executing system command:\n\t$scp $scpoptions $sourcefile $m:$cp\n" if $VERBOSE;
-
-        my $pid;
-        $pid{$m} = $pid = open(my $p, "$scp $scpoptions $sourcefile $m:$cp 2>&1 |");
-        warn "Can't execute scp $scpoptions $sourcefile $m:$cp", next unless defined($pid);
-
-        $proc{0+$p} = $m;
-        $readset->add($p);
-      }
-    }
-  }
+  } # for @destination
 
   return (\%pid, \%proc);
 }
@@ -407,7 +410,8 @@ sub parpush {
     %arg,
   );
 
-  my $okh = wait_for_answers($readset, $proc);
+  my $okh = {};
+  $okh = wait_for_answers($readset, $proc) unless $DRYRUN;;
 
   return wantarray? ($okh, $pid) : $okh;
 }
