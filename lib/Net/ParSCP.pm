@@ -20,7 +20,7 @@ our @EXPORT = qw(
   $DRYRUN
 );
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 our $VERBOSE = 0;
 our $DRYRUN = 0;
 
@@ -256,12 +256,12 @@ sub wait_for_answers {
     
     my %source;
     $source{''} = \@localpaths if @localpaths; # '' is the local machine
-    while (my ($machine, $path) = splice(@externalmachines, 0, 2)) {
-      if (exists $source{$machine} ) {
-        push @{$source{$machine}}, $path;
+    while (my ($clusterexp, $path) = splice(@externalmachines, 0, 2)) {
+      if (exists $source{$clusterexp} ) {
+        push @{$source{$clusterexp}}, $path;
       }
       else {
-        $source{$machine} = [ $path ]
+        $source{$clusterexp} = [ $path ]
       }
     }
     return %source;
@@ -289,6 +289,22 @@ sub translate {
   return $set;
 }
 
+# Gives the same value for entries $entry1 and $entry2 
+# in the hash referenced by $rh
+sub make_synonymous {
+  my ($rh, $entry1, $entry2, $defaultvalue) = @_;
+
+  if (exists $rh->{$entry1}) {
+    $rh->{$entry2} = $rh->{$entry1} 
+  }
+  elsif (exists $rh->{$entry2}) {
+    $rh->{$entry1} = $rh->{$entry2};
+  }
+  else { 
+    $rh->{$entry1} =  $rh->{$entry2} = $defaultvalue;
+  }
+}
+
 sub spawn_secure_copies {
   my %arg = @_;
   my $readset = $arg{readset};
@@ -301,26 +317,9 @@ sub spawn_secure_copies {
   my $scpoptions = $arg{scpoptions} || '';
   my $sourcefile = $arg{sourcefile};
   my $name = $arg{name};
-  
-  # '' and localhost are synonimous
-  if (exists $name->{''}) {
-    $name->{localhost} = $name->{''} 
-  }
-  elsif (exists $name->{localhost}) {
-    $name->{''} = $name->{localhost};
-  }
-  else { 
-    $name->{localhost} =  $name->{''} = 'localhost'
-  }
-  $VERBOSE++ if $DRYRUN;
 
   # hash source: keys: source machines. values: lists of source paths for that machine
   my (%pid, %proc, %source);
-
-  # @# stands for the source machine: decompose the transfer, one per source machine
-  %source = parse_sourcefile($sourcefile) if "@destination" =~ /@#/;
-
-  # expand clusters in sourcefile
 
   my $sendfiles = sub {
     my ($m, $cp) = @_;
@@ -329,7 +328,6 @@ sub spawn_secure_copies {
     my $targetname = exists($name->{$m}) ? $name->{$m} : $m;
     $cp =~ s/@=/$targetname/g;
 
-    if ($cp =~ /@#/ && %source) {
       # @# stands for source machine: decompose transfer
       for my $sm (keys %source) {
         my $sf = $sm? "$sm:@{$source{$sm}}" : "@{$source{$sm}}"; # $sm: source machine
@@ -351,21 +349,28 @@ sub spawn_secure_copies {
           $readset->add($p);
         }
       }
-    }
-    else {
-      my $target = ($m eq 'localhost')? $cp : "$m:$cp";
-      warn "Executing system command:\n\t$scp $scpoptions $sourcefile $target\n" if $VERBOSE;
-
-      unless ($DRYRUN) {
-        my $pid;
-        $pid{$m} = $pid = open(my $p, "$scp $scpoptions $sourcefile $target 2>&1 |");
-        warn "Can't execute scp $scpoptions $sourcefile $m:$cp", next unless defined($pid);
-
-        $proc{0+$p} = $m;
-        $readset->add($p);
-      }
-    }
   };
+
+  # '' and 'localhost' are synonymous
+  make_synonymous($name, '', 'localhost', 'localhost');
+
+  $VERBOSE++ if $DRYRUN;
+
+  # @# stands for the source machine: decompose the transfer, one per source machine
+  %source = parse_sourcefile($sourcefile); #  if "@destination" =~ /@#/;
+
+  # expand clusters in sourcefile
+  for my $ce (keys %source) {
+    next unless $ce; # go ahead if local machine
+    my $set = translate($configfile, $ce, \%cluster, \%method);
+
+    # leave it as it is if is a single node
+    next unless $set->members > 1;
+
+    my $paths = $source{$ce};
+    $source{$_} = $paths for $set->members;
+    delete $source{$ce};
+  }
 
   for (@destination) {
 
@@ -377,10 +382,12 @@ sub spawn_secure_copies {
 
     if ($1) {  # There is a target machine
       ($clusterexp, $path) = split /\s*:\s*/;
+
       my $set = translate($configfile, $clusterexp, \%cluster, \%method);
       next unless $set;
 
       $sendfiles->($_, $path) for ($set->members);
+
     }
     else { # No target cluster: target is the local machine
       $path = $2;
