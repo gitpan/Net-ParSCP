@@ -2,7 +2,7 @@ use warnings;
 use strict;
 
 our $totaltests;
-BEGIN { $totaltests = 42; }
+BEGIN { $totaltests = 45; }
 use Test::More tests => $totaltests;
 
 BEGIN { use_ok('Net::ParSCP') };
@@ -76,6 +76,13 @@ SKIP: {
      like($output, qr{scp  beowulf:.bashrc orion:/tmp/BASHRC_AT_beowulf}, 'cluster2cluster: b->o');
      like($output, qr{scp  europa:.bashrc orion:/tmp/BASHRC_AT_europa}, 'cluster2cluster: e->o');
      like($output, qr{scp  orion:.bashrc orion:/tmp/BASHRC_AT_orion}, 'cluster2cluster: o->o');
+
+     # One-liner
+     $output = `perl -Ilib -MNet::ParSCP -e '\$VERBOSE = 1; parpush(sourcefile=>q{MANIFEST}, destination=>q{beo-europa:/tmp/})' 2>&1`;
+     ok(!$?, 'one liner: status 0');
+     like($output, qr{scp  MANIFEST beowulf:/tmp/}, 'one liner: scp to b');
+     like($output, qr{scp  MANIFEST orion:/tmp/}, 'one liner: scp to o');
+
 }
 
 

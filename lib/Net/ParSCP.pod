@@ -1,6 +1,6 @@
 =head1 NAME
 
-Net::ParSCP - Parallel secure copy
+Net::ParSCP - Secure transfer of files between clusters via SSH
 
 =head1 SYNOPSIS
 
@@ -8,32 +8,6 @@ Net::ParSCP - Parallel secure copy
   # the machines in cluster 'clu' but 'june'
   $ perl -MNet::ParSCP \
      -e 'parpush(sourcefile=>q{file}, destination=>q{clu-june:/tmp/})'
-
-=head1 OPTIONS
-
-Usage:
-  parpush [ options ] sourcefile clusterexp1:/path1 clusterexp2:/path2 ...
-
-Valid options:
-
- --configfile file : Configuration file
-
- --scpoptions      : A string with the options for scp.
-                     The default is no options and '-r' if 
-                     sourcefile is adirectory
-
- --program         : A string with the name of the program to use for secure copy
-                     by default is 'scp'
-
- --processes       : Maximum number of concurrent processes
-
- --verbose
-
- --xterm           : runs cssh to the target machines
-
- --help            : this help
-
- --Version
 
 
 =head1 DESCRIPTION
@@ -43,7 +17,7 @@ the script L<parpush>.
 
 =head2 parpush
 
-The only sub of interest is C<parpush>:
+The main function is C<parpush>:
 
 
   ($okh, $pid) = parpush(
@@ -57,18 +31,22 @@ The only sub of interest is C<parpush>:
 only C<sourcefile> and C<destination> are required. The
 other arguments are optional.
 
-In a list context returns to hash references C<($okh, $pid)>.
+In a list context returns two hash references C<($okh, $pid)>.
 
 =over 2
 
-=item C<%$okh> is a hash with keys the names of the machines considered
-during the connection. The value is true (1) if the connection
-was closed succesfully, false otherwise.
+=item C<%$okh> 
 
-=item  C<%$pid> is a hash with keys the names of the machines considered
-during the connection. The value is the process identifier of the 
-process that made the C<scp> to that machine, C<undef> if the fork
-failed.
+Is a hash with keys the names of the machines considered
+during the connections. The value is true (1) if all the connections
+with the corresponding machine were closed succesfully, false otherwise.
+
+=item  C<%$pid> 
+
+Is a hash with keys the names of the machines considered
+during the connection. The value is an anonymous list 
+with the process identifiers of the connections 
+(C<undef> if the fork failed) to that machine. 
 
 =back
 
@@ -76,10 +54,11 @@ failed.
 
   parpush
   exec_cssh
-  help 
+  help
   version
   usage 
   $VERBOSE
+  $DRYRUN
 
 =head1 SEE ALSO
 
@@ -99,6 +78,10 @@ failed.
 
 
 =item * L<parpush>
+
+
+
+=item * L<Net::CascadeCopy>
 
 
 =back
