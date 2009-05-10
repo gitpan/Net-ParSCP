@@ -20,7 +20,7 @@ our @EXPORT = qw(
   $DRYRUN
 );
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 our $VERBOSE = 0;
 our $DRYRUN = 0;
 
@@ -77,7 +77,9 @@ sub read_configfile {
     return grep { m{$regexp}x } @desc;
   }
 
-  usage('Error. Configuration file not found!') unless -r $configfile;
+  warn("Warning. Configuration file not found!\n") if $VERBOSE;
+
+  return ();
 }
 
 ############################################################

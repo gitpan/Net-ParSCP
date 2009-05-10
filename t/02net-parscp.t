@@ -2,7 +2,7 @@ use warnings;
 use strict;
 
 our $totaltests;
-BEGIN { $totaltests = 45; }
+BEGIN { $totaltests = 47; }
 use Test::More tests => $totaltests;
 
 BEGIN { use_ok('Net::ParSCP') };
@@ -12,7 +12,13 @@ BEGIN { use_ok('Net::ParSCP') };
 SKIP: {
   skip("Developer test", $totaltests-1) unless ($ENV{DEVELOPER} && -x "script/parpush" && ($^O =~ /nux$/));
 
+     rename "$ENV{HOME}/.csshrc", "$ENV{HOME}/csshrc";
      my $output = `script/parpush -v 'orion:.bashrc beowulf:.bashrc' europa:/tmp/bashrc.@# 2>&1`;
+     like($output, qr{scp\s+beowulf:.bashrc\s+europa:.tmp.bashrc.beowulf}, 'using macro for source machine: remote target');
+     like($output, qr{scp\s+orion:.bashrc europa:/tmp/bashrc.orion}, 'using macro for source machine: remote target');
+     rename "$ENV{HOME}/csshrc", "$ENV{HOME}/.csshrc";
+
+     $output = `script/parpush -v 'orion:.bashrc beowulf:.bashrc' europa:/tmp/bashrc.@# 2>&1`;
      like($output, qr{scp\s+beowulf:.bashrc\s+europa:.tmp.bashrc.beowulf}, 'using macro for source machine: remote target');
      like($output, qr{scp\s+orion:.bashrc europa:/tmp/bashrc.orion}, 'using macro for source machine: remote target');
      ok(!$?, 'macro for source machine: status 0');
@@ -40,12 +46,18 @@ SKIP: {
      like($output, qr{scp  beowulf:.bashrc europa:/tmp/bashrc.BEO}, 'macro for source with 2 -n options: correct command 1');
      like($output, qr{scp  orion:.bashrc europa:/tmp/bashrc.ORION}, 'macro for source with 2 -n options: correct command 2');
      
+     system('rm -fR /tmp/bashrc.BEOW /tmp/bashrc.ORI');
+
+SKIP: {
+     skip('Files /tmp/bashrc.BEOW and /tmp/bashrc.ORI exist', 5) if (-e '/tmp/bashrc.BEOW' || -e '/tmp/bashrc.ORI');
+
      $output = `script/parpush -n orion=ORI -n beowulf=BEOW -v 'orion:.bashrc beowulf:.bashrc' :/tmp/bashrc.@# 2>&1`;
      ok(!$?, 'macro for source with 2 -n options (to local): status 0');
      like($output, qr{scp -r beowulf:.bashrc /tmp/bashrc.BEOW}, 'macro for source with 2 -n options (to local): correct command 1');
      like($output, qr{scp -r orion:.bashrc /tmp/bashrc.ORI}, 'macro for source with 2 -n options (to local): correct command 2');
      ok(-e '/tmp/bashrc.BEOW', '/tmp/bashrc.BEOW remote file transferred');
      ok(-e '/tmp/bashrc.ORI', 'remote file transferred');
+}
 
      $output = `script/parpush -h`;
      ok(!$?, 'help: status 0');

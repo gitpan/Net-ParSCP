@@ -41,6 +41,9 @@ SKIP: {
 
      system('rm -fR /tmp/.bashrc /tmp/tutu/');
 
+SKIP: {
+     skip('Files /tmp/.bashrc and /tmp/tutu/ exists',6) if (-e '/tmp/.bashrc' || -e '/tmp/tutu/');
+
      $output = `script/parpush -v 'orion:.bashrc beowulf:tutu/' :/tmp/ 2>&1`;
      like($output, qr{Executing system command:\s+scp -r orion:.bashrc\s+/tmp/}, '2 remotes to local: scp command orion');
      like($output, qr{Executing system command:\s+scp -r beowulf:tutu/\s+/tmp/}, '2 remotes to local: scp command beowulf');
@@ -48,6 +51,7 @@ SKIP: {
      ok(-e '/tmp/.bashrc', 'remote file transferred');
      ok(-x '/tmp/tutu', 'remote dir transferred');
      ok(!$?, 'remote to local: status 0');
+}
 
      $output = `script/parpush -h`;
      like($output, qr{^Name:\s+parpush - Secure transfer of files between clusters via SSH}, 'help flag');
