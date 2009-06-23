@@ -106,6 +106,10 @@ parpush - Secure transfer of files between clusters via SSH
   # Copy 'sourcefile' to the union of cluster1 and cluster2
   $ parpush sourcefile  cluster1+cluster2:/tmp 
 
+  # Copy 'sourcefile' to the /tmp/ directory in machine1, machine2, machine3
+  # machine4 and machine 5
+  $ parpush sourcefile machine1..5:/tmp/  
+
   # Copy 'sourcefile' to the intersection of cluster1 and cluster2
   # i.e. to 'machine2'
   $ parpush sourcefile  cluster1*cluster2:/tmp 
@@ -340,6 +344,14 @@ C<~/.csshrc> file.
 =item * C<s - t> difference
 
 =item * C<s % t> symmetric_difference
+
+=item * Ranges are allowed. Use C<..> to define them.
+Thus C<cc101..102.4..5> defines the set of machines
+
+   cc101.4
+   cc101.5
+   cc102.4
+   cc102.5
 
 =back
 

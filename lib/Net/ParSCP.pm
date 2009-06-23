@@ -2,10 +2,9 @@ package Net::ParSCP;
 use strict;
 use warnings;
 
-use Set::Scalar;
 use IO::Select;
 use Pod::Usage;
-#use Sys::Hostname;
+use Net::HostLanguage;
 
 require Exporter;
 
@@ -20,95 +19,8 @@ our @EXPORT = qw(
   $DRYRUN
 );
 
-our $VERSION = '0.12';
-our $VERBOSE = 0;
+our $VERSION = '0.13';
 our $DRYRUN = 0;
-
-# Create methods for each defined machine or cluster
-sub create_machine_alias {
-  my %cluster = @_;
-
-  my %method; # keys: machine addresses. Values: the unique name of the associated method
-
-  no strict 'refs';
-  for my $m (keys(%cluster)) {
-    my $name  = uniquename($m);
-    *{__PACKAGE__.'::'.$name} = sub { 
-      $cluster{$m} 
-     };
-    $method{$m} = $name;
-  }
-
-  return \%method;
-}
-
-# Return an array with the relevant lines of the config file
-sub read_configfile {
-  my $configfile = $_[0];
-
-
-  if (defined($configfile) && -r $configfile) {
-    open(my $f, $configfile);
-    my @desc = <$f>;
-    chomp(@desc);
-    return @desc;
-  }
-
-  # Configuration file not found. Try with ~/.csshrc of cssh
-  $configfile = $_[0] = "$ENV{HOME}/.csshrc";
-  if (-r $configfile) {
-    open(my $f, $configfile);
-
-    # We are interested in lines matching 'option = values'
-    my @desc = grep { m{^\s*(\S+)\s*=\s*(.*)\s*} } <$f>;
-    close($f);
-    chomp(@desc);
-
-    my %config = map { m{^\s*(\S+)\s*=\s*(.*)\s*} } @desc;
-
-    # Get the clusters. It starts 'cluster = ... '
-    my $regexp = $config{clusters};
-
-    # create regexp (^beo\s*=)|(^be\s*=)
-    $regexp =~ s/\s*(\S+)\s*/(^$1\\s*=)|/g;
-    $regexp =~ s/[|]\s*$//;
-
-    # Select the lines that correspond to clusters
-    return grep { m{$regexp}x } @desc;
-  }
-
-  warn("Warning. Configuration file not found!\n") if $VERBOSE;
-
-  return ();
-}
-
-############################################################
-sub parse_configfile {
-  my $configfile = $_[0];
-  my %cluster;
-
-  my @desc = read_configfile($_[0]);
-
-  for (@desc) {
-    next if /^\s*(#.*)?$/;
-
-    my ($cluster, $members) = split /\s*=\s*/;
-    die "Error in configuration file $configfile invalid cluster name $cluster" unless $cluster =~ /^[\w.]+$/;
-
-    my @members = split /\s+/, $members;
-
-    for my $m (@members) {
-      die "Error in configuration file $configfile invalid name $m" unless $m =~ /^[\@\w.]+$/;
-      $cluster{$m} = Set::Scalar->new($m) unless exists $cluster{$m};
-    }
-    $cluster{$cluster} = Set::Scalar->new(@members);
-  }
-
-  # keys: machine and cluster names; values: name of the associated method 
-  my $method = create_machine_alias(%cluster); 
-
-  return (\%cluster, $method);
-}
 
 ############################################################
 sub version {
@@ -144,19 +56,6 @@ sub help {
 }
 
 
-############################################################
-{
-  my $pc = 0;
-
-  sub uniquename {
-    my $m = shift;
-
-    $m =~ s/\W/_/g;
-    $pc++;
-    return "_$pc"."_$m";
-  }
-}
-
 sub exec_cssh {
   my @machines = @_;
 
@@ -166,30 +65,6 @@ sub exec_cssh {
   my $pid;
   exec("$csshcommand &");
   die "Can't execute cssh\n";
-}
-
-sub warnundefined {
-  my ($configfile, @errors) = @_;
-
-  local $" = ", ";
-  my $prefix = (@errors > 1) ?
-      "Machine identifiers (@errors) do"
-    : "Machine identifier (@errors) does";
-  warn "$prefix not correspond to any cluster or machine defined in ".
-       " cluster description file '$configfile'.\n";
-}
-
-sub non_declared_machines {
-  my $configfile = shift;
-  my $clusterexp = shift;
-  my %cluster = @_;
-
-  my @unknown;
-  my @clusterexp = $clusterexp =~ m{([a-zA-Z_][\w.\@]*)}g;
-  if (@unknown = grep { !exists($cluster{$_}) } @clusterexp) {
-    warnundefined($configfile, @unknown) if $VERBOSE;
-  }
-  return @unknown;
 }
 
 sub wait_for_answers {
@@ -241,9 +116,11 @@ sub wait_for_answers {
   return \%result;
 }
 
-# Find out what source machines are involved 
-# %source is returned. machine => [ paths ]
-# key '' represents the local machine
+# parse_sourcefile: Find out what source machines are involved 
+# A hash %source is returned. Keys are the source machines.
+# Values are the list of source paths
+# machine => [ paths ]
+# The special key '' (emtpy string) represents the local machine
 {
   my $nowhitenocolons = '(?:[^\s:]|\\\s)+'; # escaped spaces are allowed
 
@@ -270,27 +147,6 @@ sub wait_for_answers {
   }
 }
 
-# Autodeclare unknown machine identifiers
-sub translate {
-  my ($configfile, $clusterexp, $cluster, $method) = @_;
-
-  my @unknown = non_declared_machines($configfile, $clusterexp, %$cluster);
-  my %unknown = map { $_ => Set::Scalar->new($_)} @unknown;
-  %$cluster = (%$cluster, %unknown); # union
-  %$method = (%$method, %{create_machine_alias(%unknown)});
-
-  $clusterexp =~ s/(\w[\w.\@]*)/$method->{$1}()/g;
-  my $set = eval $clusterexp;
-
-  unless (defined($set) && ref($set) && $set->isa('Set::Scalar')) {
-    $clusterexp =~ s/_\d+_//g;
-    $clusterexp =~ s/[()]//g;
-    warn "Error. Expression '$clusterexp' has errors. Skipping.\n";
-    return;
-  }
-  return $set;
-}
-
 # Gives the same value for entries $entry1 and $entry2 
 # in the hash referenced by $rh
 sub make_synonymous {
@@ -306,6 +162,7 @@ sub make_synonymous {
     $rh->{$entry1} =  $rh->{$entry2} = $defaultvalue;
   }
 }
+
 
 sub spawn_secure_copies {
   my %arg = @_;
@@ -384,11 +241,11 @@ sub spawn_secure_copies {
 
     my ($clusterexp, $path);
     unless (/^([^:]*):([^:]*)$/) {
-      warn "Error. Destination '$_' must have no more than one colon (:). Skipping transfer.\n";
+      warn "Error. Destination '$_' must have just one colon (:). Skipping transfer.\n";
       next;
     }
 
-    if ($1) {  # There is a target machine
+    if ($1) {  # There is a target cluster expression
       ($clusterexp, $path) = split /\s*:\s*/;
 
       my $set = translate($configfile, $clusterexp, \%cluster, \%method);

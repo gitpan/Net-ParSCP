@@ -2,7 +2,7 @@ use warnings;
 use strict;
 
 our $totaltests;
-BEGIN { $totaltests = 47; }
+BEGIN { $totaltests = 48; }
 use Test::More tests => $totaltests;
 
 BEGIN { use_ok('Net::ParSCP') };
@@ -17,6 +17,17 @@ SKIP: {
      like($output, qr{scp\s+beowulf:.bashrc\s+europa:.tmp.bashrc.beowulf}, 'using macro for source machine: remote target');
      like($output, qr{scp\s+orion:.bashrc europa:/tmp/bashrc.orion}, 'using macro for source machine: remote target');
      rename "$ENV{HOME}/csshrc", "$ENV{HOME}/.csshrc";
+
+     # Range
+     $output = `script/parpush -v -d Makefile 127.0.0.1..5:/tmp/ 2>&1`;
+     my $ok = $output =~  m{
+            scp\s+Makefile\s+127.0.0.3:/tmp/.+
+            scp\s+Makefile\s+127.0.0.1:/tmp/.+
+            scp\s+Makefile\s+127.0.0.5:/tmp/.+
+            scp\s+Makefile\s+127.0.0.4:/tmp/.+
+            scp\s+Makefile\s+127.0.0.2:/tmp/
+     }xs;
+     ok($ok,'checking ranges');
 
      $output = `script/parpush -v 'orion:.bashrc beowulf:.bashrc' europa:/tmp/bashrc.@# 2>&1`;
      like($output, qr{scp\s+beowulf:.bashrc\s+europa:.tmp.bashrc.beowulf}, 'using macro for source machine: remote target');
@@ -94,7 +105,6 @@ SKIP: {
      ok(!$?, 'one liner: status 0');
      like($output, qr{scp  MANIFEST beowulf:/tmp/}, 'one liner: scp to b');
      like($output, qr{scp  MANIFEST orion:/tmp/}, 'one liner: scp to o');
-
 }
 
 

@@ -16,7 +16,8 @@ SKIP: {
   skip("Developer test", 15) unless ($ENV{DEVELOPER} && -x "script/parpush" && ($^O =~ /nux$/));
 
      my $output = `script/parpush -v MANIFEST  beo-chum:/tmp 2>&1`;
-     like($output, qr/(identifier \(chum\) does not correspond)|(ssh:.*not known)/, 'Illegal machine name');
+     my $ok = $output =~ m{Executing system command:\s+scp\s+MANIFEST beowulf:/tmp.*scp\s+MANIFEST europa:/tmp.*scp\s+MANIFEST orion:/tmp}s;
+     ok($ok, 'Not Illegal machine names');
 
      $output = `script/parpush -v MANIFEST  trutu-orion:/tmp 2>&1`;
      like($output, qr/(identifier \(trutu\) does not correspond)|(ssh:.*not known)/, 'Illegal cluster name');
