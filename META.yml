@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Net-ParSCP
-version:            0.13
+version:            0.14
 abstract:           Secure transfer of files between clusters via SSH
 author:
     - Casiano Rodriguez-Leon <casiano.rodriguez.leon@gmail.com>

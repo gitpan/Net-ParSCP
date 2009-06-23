@@ -38,18 +38,14 @@ unmap_on_redraw=no
 use_hotkeys=yes
 window_tiling=yes
 window_tiling_direction=right
-clusters = beno ben beo bno bco be bo eo et num beat local
+clusters = beno ben beo bno bco be num beow
+beow = beowulf europa orion tegasaste
 beno = beowulf europa nereida orion
 ben = beowulf europa nereida 
 beo = beowulf europa orion
 bno = beowulf nereida orion
 bco = beowulf casnereida orion
 be  = beowulf europa
-bo  = beowulf orion
-eo  =  europa orion
-et  = europa etsii
+extra_cluster_file=$HOME/.csshlocals, ~/.csshothers
 #     europa          etsii
 num = 193.145.105.175 193.145.101.246
-# With @
-beat  = casiano@beowulf casiano@europa
-local = local1 local2 local3 

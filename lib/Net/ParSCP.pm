@@ -19,7 +19,7 @@ our @EXPORT = qw(
   $DRYRUN
 );
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 our $DRYRUN = 0;
 
 ############################################################
