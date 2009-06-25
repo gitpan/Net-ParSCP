@@ -4,6 +4,8 @@ use strict;
 
 # the contents of the Makefile that is written.
 
+my $MACHINES;
+
 if (defined($ENV{DEVELOPER}) && ($ENV{DEVELOPER} eq 'casiano')) {
   if (-r 'makepods') {
     system('make -f makepods') and die "Can't build pods!";
@@ -11,10 +13,10 @@ if (defined($ENV{DEVELOPER}) && ($ENV{DEVELOPER} eq 'casiano')) {
   else {
     warn "makepods not found!. Skipping creation of pods\n";
   }
+  $MACHINES = $ENV{MACHINES} || '127.0.0.1 127.0.0.2';
 }
 
 my @exe_files = map { "script/$_" } qw{parpush};
-my @LIBS = ( 'lib/Net/ParSCP.pm' );
 
 WriteMakefile(
     NAME              => 'Net::ParSCP',
@@ -30,29 +32,30 @@ sub MY::postamble {
 
   return '' unless defined($ENV{DEVELOPER}) && ($ENV{DEVELOPER} eq 'casiano');
 
-	$_ = targets();
-  my $r = "@exe_files @LIBS";
-	s/<<TAG_FILES>>/$r/g;
+  $_ = targets();
+  s/<<MACHINES>>/$MACHINES/g;
 
   return $_;
 }
 
 sub targets {
-  my %var = @_;
-
   return <<'EOSQT';
 
 PLTAGS=/usr/share/vim/vim71/tools/pltags.pl
 
 coverage:
-	cover -delete
+	 cover -delete
 	make HARNESS_PERL_SWITCHES=-MDevel::Cover test
 	cover
 
 .PHONY: tags
 tags: 
-	${PLTAGS} <<TAG_FILES>> 
+	${PLTAGS} script/parpush lib/Net/ParSCP.pm lib/Net/HostLanguage.pm
 	ctags -a --exclude=examples --exclude=t --exclude=doc --exclude=tt2
+
+remotetest:
+	remotetest.pl ${DISTVNAME}.tar.gz <<MACHINES>>
+
 EOSQT
 
 }

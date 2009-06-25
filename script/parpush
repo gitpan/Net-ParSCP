@@ -54,22 +54,30 @@ parpush - Secure transfer of files between clusters via SSH
 
   parpush [options] '*.tar.gz m1:*.pl m2:*.txt' c1%c2:/dir1 c3+c4:/dir2 ... 
 
-  # You need to set first a configuration file or have a 
-  # $HOME/.csshrc file with the cluster option defined:
+  # You need to set first a configuration file describing the
+  # set of clusters: 
 
-      $ cat Cluster
+      $ cat $HOME/.clustersrc
       cluster1 = machine1 machine2 machine3
       cluster2 = machine2 machine4 machine5
       num = 193.140.101.175 193.140.101.246
+      # Comments are allowed
+      # same as range = cc100 cc101 cc102
+      range = cc100..102
 
-  # or have the .csshrc file associated with cssh.
+  # or have the cluster defined in the $HOME/.csshrc file associated with cssh.
 
 
 
 =head1 OPTIONS
 
  --configfile file 
-                    Configuration file
+                    File describing the clusters. If not specified
+                    parpush will look for the files:
+                       $HOME/.clustersrc
+                       $HOME/.csshrc
+                       /etc/clusters
+
 
  --scpoptions 'options for scp'
                      A string with the options for scp.
@@ -84,7 +92,7 @@ parpush - Secure transfer of files between clusters via SSH
                     It may appear several times.
                     The value associated used with machine1
                     will be used  in the @# and @= macros 
-                    instead the machine name
+                    instead the machine name. 
 
  --processes       
                     Maximum number of concurrent processes
@@ -129,6 +137,12 @@ parpush - Secure transfer of files between clusters via SSH
   # Thus, the file .bashrc in machine1 will be copied as 
   # '/tmp/bashrc_at_machine1' in the machines in 'cluster2':
   $ parpush -v cluster1:.bashrc cluster2:/tmp/bashrc_at_@#
+
+  # Copies .bashrc in machine1 and .bashrc in machine2
+  # to machine3:/tmp/bashrc.ORION and machine3:/tmp/bashrc.BEO
+  $ parpush -n machine1=ORION -n machine2=BEO \
+            'machine1:.bashrc beowulf:.bashrc' \
+            machine3:/tmp/bashrc.@#
 
   # A more complicated formula.
   # Though 'machine2' is an alias for 193.140.101.175, (see the
@@ -202,138 +216,50 @@ Then issue the usual commands (or use C<cpan>):
    make test
    make install
 
-=head1 SETTING AUTOMATIC AUTHENTICATION
-
-To use this script you have to set 
-automatic authentication via SSH between the source machine (your
-machine) and the other destiny machines.
-This section explains the simplified procedure. 
-
-SSH includes the ability to authenticate users using public keys. Instead of 
-authenticating the user with a password, the SSH server on the remote machine will
-verify a challenge signed by the user's I<private key> against its copy
-of the user's I<public key>. To achieve this automatic ssh-authentication
-you have to:
-
-=over 2
-
-=item * Generate a public key use the C<ssh-keygen> utility. For example:
-
-  local.machine$ ssh-keygen -t rsa -N ''
-
-The option C<-t> selects the type of key you want to generate.
-There are three types of keys: I<rsa1>, I<rsa> and I<dsa>.
-The C<-N> option is followed by the I<passphrase>. The C<-N ''> setting
-indicates that no passphrase will be used. This is useful when used 
-with key restrictions or when dealing with cron jobs, batch 
-commands and automatic processing which is the context in which this 
-module was designed.
-If still you don't like to have a private key without passphrase, 
-provide a passphrase and use C<ssh-agent> 
-to avoid the inconvenience of typing the passphrase each time. 
-C<ssh-agent> is a program you run once per login session and load your keys into.
-From that moment on, any C<ssh> client will contact C<ssh-agent>
-and no more passphrase typing will be needed.
-
-By default, your identification will be saved in a file C</home/user/.ssh/id_rsa>.
-Your public key will be saved in C</home/user/.ssh/id_rsa.pub>.
-
-=item * Once you have generated a key pair, you must install the public key on the 
-remote machine. To do it, append the public component of the key in
-
-           /home/user/.ssh/id_rsa.pub
-
-to file 
-
-           /home/user/.ssh/authorized_keys
-           
-on the remote machine.
-If the C<ssh-copy-id> script is available, you can do it using:
-
-  local.machine$ ssh-copy-id -i ~/.ssh/id_rsa.pub user@remote.machine
-
-Alternatively you can write the following command:
-
-  $ ssh remote.machine "umask 077; cat >> .ssh/authorized_keys" < /home/user/.ssh/id_rsa.pub
-
-The C<umask> command is needed since the SSH server will refuse to 
-read a C</home/user/.ssh/authorized_keys> files which have loose permissions.
-
-=item * Edit your local configuration file C</home/user/.ssh/config> (see C<man ssh_config> 
-in UNIX) and create a new section for C<GRID::Machine> connections to that host.
-Here follows an example:
-
-
- ...
-
- # A new section inside the config file: 
- # it will be used when writing a command like: 
- #                     $ ssh gridyum 
-
- Host gridyum
-
- # My username in the remote machine
- user my_login_in_the_remote_machine
-
- # The actual name of the machine: by default the one provided in the
- # command line
- Hostname real.machine.name
-
- # The port to use: by default 22
- Port 2048
-
- # The identitiy pair to use. By default ~/.ssh/id_rsa and ~/.ssh/id_dsa
- IdentityFile /home/user/.ssh/yumid
-
- # Useful to detect a broken network
- BatchMode yes
-
- # Useful when the home directory is shared across machines,
- # to avoid warnings about changed host keys when connecting
- # to local host
- NoHostAuthenticationForLocalhost yes
-
-
- # Another section ...
- Host another.remote.machine an.alias.for.this.machine
- user mylogin_there
-
- ...
-
-This way you don't have to specify your I<login> name on the remote machine even if it
-differs from your  I<login> name in the local machine, you don't have to specify the 
-I<port> if it isn't 22, etc. This is the I<recommended> way to work with C<GRID::Machine>.
-Avoid cluttering the constructor C<new>.
-
-=item * Once the public key is installed on the server you should be able to
-authenticate using your private key
-
-  $ ssh remote.machine
-  Linux remote.machine 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686
-  Last login: Sat Jul  7 13:34:00 2007 from local.machine
-  user@remote.machine:~$                                 
-
-=back
 
 =head1 DESCRIPTION
 
 C<parpush> push files and directories across sets of remote machines.
 
 
-=head2 Cluster Syntax
+=head2 Syntax of Cluster Description Files
 
-C<parpush> looks for a filename named C<Cluster> in the current
-directory or it looks for the cluster C<~/.csshrc> used by C<cssh>:
+Unless the option C<--configfile> is specified
+C<parpush> will look for a filename named C<~/.clusterrc> in the home
+directory. If it does not exists, the looks for C<~/.csshrc>.
+Last, it looks for the file C</etc/clusters>.
 
       $ cat Cluster
       cluster1 = machine1 machine2 machine3
       cluster2 = machine2 machine4 machine5
       num = 193.140.101.175 193.140.101.246
+      range = cc10..11a4..5
+
+Ranges are allowed. Thus, the definition above
+
+      range = cc10..11a4..5
+
+is equivalent to:
+
+      range = cc10a4 cc10a5 cc11a4 cc11a5
 
 See C<man cssh> to find out how to describe a cluster in the
 C<~/.csshrc> file.
 
-=head2 Cluster Expressions
+=head2 C<parpush> Syntax
+
+When calling C<parpush> you have to specify the source and the targets.
+Each target is split in two parts: the cluster description and the 
+path. You have to write a colon for any target, even if the target is the local host.
+This behavior differs from C<scp>.
+in the example below C<'file.txt'> in C<machine1> will be copied to 
+file C<'/tmp/file.txt.machine1'> in the local machine. File C<'file.txt'> in C<machine2> 
+will be copied to file C<'/tmp/file.txt.machine2'> in the local machine
+
+  $ parpush 'machine1..2:file.txt' :/tmp/file_txt.@#  
+
+
+=head2 The Syntax of Cluster Expressions
 
 =over 2
 
@@ -388,8 +314,134 @@ inside single quotes as in:
 
   $ parpush  'machine1:file1.txt machine2:file2.txt' cluster1-machine1-machine2:
 
-the only cluster expressions allowed in sourcefile expressions are machines.
-Cluster expressions aren't supported.
+cluster expressions can be used in the source description argument as in:
+
+  $ parpush -v 'machine1+machine2:.bashrc' machine3:/tmp/bashrc_at_@#
+  Executing system command:
+          scp  machine1:.bashrc machine3:/tmp/bashrc_at_machine1
+  Executing system command:
+          scp  machine2:.bashrc machine3:/tmp/bashrc_at_machine2
+  machine3 output:
+
+  machine3 output:
+
+=head1 SETTING SSH AUTOMATIC AUTHENTICATION 
+
+To use this script you have to set 
+automatic authentication via SSH between the source machine (your
+machine) and the other destiny machines.
+This section explains the simplified procedure. 
+
+SSH includes the ability to authenticate users using public keys. Instead of 
+authenticating the user with a password, the SSH server on the remote machine will
+verify a challenge signed by the user's I<private key> against its copy
+of the user's I<public key>. To achieve this automatic ssh-authentication
+you have to:
+
+=over 2
+
+=item * Generate a public key use the C<ssh-keygen> utility. For example:
+
+  local.machine$ ssh-keygen -t dsa -N ''
+
+The option C<-t> selects the type of key you want to generate.
+There are three types of keys: I<rsa1>, I<rsa> and I<dsa>.
+The C<-N> option is followed by the I<passphrase>. The C<-N ''> setting
+indicates that no passphrase will be used. This is useful when used 
+with key restrictions or when dealing with cron jobs, batch 
+commands and automatic processing which is the context in which this 
+module was designed.
+By default, in OpenSSH, your identification will be saved in a file C</home/user/.ssh/id_dsa>.
+Your public key will be saved in C</home/user/.ssh/id_dsa.pub>.
+
+=item *
+If still you don't like to have a private key without passphrase, 
+provide a passphrase and use C<ssh-agent> 
+to avoid the inconvenience of typing the passphrase each time. 
+C<ssh-agent> is a program you run once per login session and load your keys into.
+Keys are added to the C<ssh-agent> using the program C<ssh-add>. 
+From that moment on, any C<ssh> client will contact C<ssh-agent>
+and no more passphrase typing will be needed.
+Use the program C<keychain> to manage the communication with the agent from different 
+sessions.
+
+=item * Once you have generated a key pair, you must install the public key on the 
+remote machine. To do it, append the public component of the key in
+
+           /home/user/.ssh/id_rsa.pub
+
+to file 
+
+           /home/user/.ssh/authorized_keys
+           
+on the remote machine.
+If the C<ssh-copy-id> script is available, you can do it using:
+
+  local.machine$ ssh-copy-id -i ~/.ssh/id_rsa.pub user@remote.machine
+
+Alternatively you can write the following command:
+
+  $ ssh remote.machine "umask 077; cat >> .ssh/authorized_keys" \
+                                  < /home/user/.ssh/id_rsa.pub
+
+The C<umask> command is needed since the SSH server will refuse to 
+read a C</home/user/.ssh/authorized_keys> files which have loose permissions.
+
+=item * Edit your local configuration file C</home/user/.ssh/config> (see C<man ssh_config> 
+in UNIX) and create a new section for C<GRID::Machine> connections to that host.
+Here follows an example:
+
+
+ ...
+
+ # A new section inside the config file: 
+ # it will be used when writing a command like: 
+ #                     $ ssh gridyum 
+
+ Host gridyum
+
+ # My username in the remote machine
+ user my_login_in_the_remote_machine
+
+ # The actual name of the machine: by default the one provided in the
+ # command line
+ Hostname real.machine.name
+
+ # The port to use: by default 22
+ Port 2048
+
+ # The identitiy pair to use. By default ~/.ssh/id_rsa and ~/.ssh/id_dsa
+ IdentityFile /home/user/.ssh/yumid
+
+ # Useful to detect a broken network
+ BatchMode yes
+
+ # Useful when the home directory is shared across machines,
+ # to avoid warnings about changed host keys when connecting
+ # to local host
+ NoHostAuthenticationForLocalhost yes
+
+
+ # Another section ...
+ Host another.remote.machine an.alias.for.this.machine
+ user mylogin_there
+
+ ...
+
+This way you don't have to specify your I<login> name on the remote machine even if it
+differs from your  I<login> name in the local machine, you don't have to specify the 
+I<port> if it isn't 22, etc. This is the I<recommended> way to work with C<GRID::Machine>.
+Avoid cluttering the constructor C<new>.
+
+=item * Once the public key is installed on the server and the key added to the agent,
+you should be able to authenticate using your private key
+
+  $ ssh remote.machine
+  Linux remote.machine 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686
+  Last login: Sat Jul  7 13:34:00 2007 from local.machine
+  user@remote.machine:~$                                 
+
+=back
 
 =head1 SEE ALSO
 
@@ -408,6 +460,12 @@ Cluster expressions aren't supported.
 =item * Project C3 L<http://www.csm.ornl.gov/torc/C3/>
 
 =item * L<http://code.google.com/p/net-parscp/>
+
+=item * L<GRID::Cluster>
+
+=item * L<GRID::Machine>
+
+=item * C<keychain> article: L<http://www.ibm.com/developerworks/linux/library/l-keyc2/>
 
 =back
 
